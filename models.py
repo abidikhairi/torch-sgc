@@ -25,7 +25,7 @@ class SGC(nn.Module):
         super(SGC, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.adj = adj.pow(k)
+        self.adj = normalized_adj(adj).pow(k)
 
         self.W = nn.Linear(in_features, out_features, bias=bias)
 
