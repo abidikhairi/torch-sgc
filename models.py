@@ -20,6 +20,22 @@ def normalized_adj(adj):
 
     return adj
 
+class SGC(nn.Module):
+    def __init__(self, in_features, out_features, adj, k, bias=True):
+        super(SGC, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.adj = adj.pow(k)
+
+        self.W = nn.Linear(in_features, out_features, bias=bias)
+
+    def forward(self, x):
+        support = self.adj.mm(x)
+        output = self.W(support)
+
+        return output
+
+
 class GraphConvolution(nn.Module):
     """
     Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
