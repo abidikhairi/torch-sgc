@@ -1,9 +1,10 @@
 import os
+import time
 import argparse
 import torch as th
 import torch.nn.functional as F
-from models import GCN
-from utils import accuracy
+from models import GCN, SGC
+from utils import test, train
 
 
 def main(args):
@@ -19,30 +20,32 @@ def main(args):
     nhids = args.hidden
     nclasses = labels.max().item() + 1
 
-    model = GCN(nfeats, nhids, nclasses, adj).to(device)
-    optimizer = th.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    sgc = SGC(nfeats, nclasses, adj, 2).to(device)
+    optimizer = th.optim.Adam(sgc.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     loss_fn = F.nll_loss
 
+    sgc_training_time = []
+    gcn_training_time = []
 
     for epoch in range(args.epochs):
-        model.train()
-        optimizer.zero_grad()
-        out = model(feats)
-        logits = F.log_softmax(out, dim=1)
-        loss = loss_fn(logits[train_idx], labels[train_idx])
-        
-        loss.backward()
-        optimizer.step()
+        tick = time.time()
+        train(sgc, optimizer, loss_fn, feats, labels, train_idx)
+        tock = time.time()
+        sgc_training_time.append(tock - tick)
 
-    with th.no_grad():
-        model.eval()
-        out = model(feats)
-        logits = F.log_softmax(out, dim=1)
+    gcn = GCN(nfeats, nhids, nclasses, adj).to(device)
+    optimizer = th.optim.Adam(gcn.parameters(), lr=0.1, weight_decay=5e-4)
+    loss_fn = F.nll_loss
 
-        test_loss = loss_fn(logits[test_idx], labels[test_idx]).item()
-        acc = accuracy(logits[test_idx], labels[test_idx]).item()
+    for epoch in range(args.epochs):
+        tick = time.time()
+        train(gcn, optimizer, loss_fn, feats, labels, train_idx)
+        tock = time.time()
+        gcn_training_time.append(tock - tick)
 
-        print("Test: Loss: {:.4f}, Acc: {:.4f} %".format(test_loss, acc*100))
+
+    print("SGC training time: {} ms".format(th.tensor(sgc_training_time).mean().item()))
+    print("GCN training time: {} ms".format(th.tensor(gcn_training_time).mean().item()))
 
 
 
